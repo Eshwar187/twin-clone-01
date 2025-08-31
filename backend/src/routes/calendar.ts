@@ -2,8 +2,12 @@ import { Router } from 'express';
 import { calendarController } from '@/controllers/calendarController';
 import { validateRequest } from '@/middleware/validation';
 import { calendarValidation } from '@/validations/calendarValidation';
+import { authMiddleware } from '@/middleware/auth';
 
 const router = Router();
+
+// Require authentication for all calendar routes
+router.use(authMiddleware);
 
 // Calendar overview
 router.get('/dashboard', calendarController.getDashboard);

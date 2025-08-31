@@ -214,7 +214,7 @@ healthDataSchema.methods.addWorkout = function(type: string, duration: number, c
 
 // Method to complete habit
 healthDataSchema.methods.completeHabit = function(habitId: string) {
-  const habit = this.habits.find(h => h.habitId === habitId);
+  const habit = this.habits.find((h: { habitId: string }) => h.habitId === habitId);
   if (habit) {
     habit.completed = true;
     habit.timestamp = new Date();
@@ -241,18 +241,21 @@ healthDataSchema.statics.getHealthTrends = async function(userId: string, days: 
 
 // Static method to get average health metrics
 healthDataSchema.statics.getAverageMetrics = async function(userId: string, days: number = 30) {
-  const trends = await this.getHealthTrends(userId, days);
+  const trends = await (this as any).getHealthTrends(userId, days);
   
   if (trends.length === 0) return null;
   
-  const totals = trends.reduce((acc, day) => {
-    acc.water += day.water.consumed;
-    acc.sleep += day.sleep.hours;
-    acc.steps += day.exercise.steps;
-    acc.mood += day.mood.rating;
-    acc.workouts += day.exercise.workouts.length;
-    return acc;
-  }, { water: 0, sleep: 0, steps: 0, mood: 0, workouts: 0 });
+  const totals = trends.reduce(
+    (acc: { water: number; sleep: number; steps: number; mood: number; workouts: number }, day: any) => {
+      acc.water += day.water.consumed;
+      acc.sleep += day.sleep.hours;
+      acc.steps += day.exercise.steps;
+      acc.mood += day.mood.rating;
+      acc.workouts += day.exercise.workouts.length;
+      return acc;
+    },
+    { water: 0, sleep: 0, steps: 0, mood: 0, workouts: 0 }
+  );
   
   const count = trends.length;
   

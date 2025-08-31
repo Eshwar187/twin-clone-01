@@ -96,7 +96,7 @@ avatarDataSchema.virtual('unreadInsightsCount').get(function() {
 // Virtual for recent state changes (last 7 days)
 avatarDataSchema.virtual('recentStateChanges').get(function() {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  return this.stateHistory.filter(entry => entry.timestamp >= sevenDaysAgo);
+  return this.stateHistory.filter((entry: { timestamp: Date }) => entry.timestamp >= sevenDaysAgo);
 });
 
 // Method to add new state
@@ -148,7 +148,7 @@ avatarDataSchema.methods.markInsightAsRead = function(insightId: string) {
 // Method to get state distribution
 avatarDataSchema.methods.getStateDistribution = function(days: number = 30) {
   const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const recentHistory = this.stateHistory.filter(entry => entry.timestamp >= cutoffDate);
+  const recentHistory = this.stateHistory.filter((entry: { timestamp: Date }) => entry.timestamp >= cutoffDate);
   
   const distribution: Record<AvatarState, number> = {
     happy: 0,
@@ -158,7 +158,7 @@ avatarDataSchema.methods.getStateDistribution = function(days: number = 30) {
     energetic: 0
   };
   
-  recentHistory.forEach(entry => {
+  recentHistory.forEach((entry: { state: AvatarState }) => {
     distribution[entry.state]++;
   });
   

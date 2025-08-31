@@ -32,6 +32,8 @@ export interface IUser extends Document {
   };
   createdAt: Date;
   updatedAt: Date;
+  // Instance methods defined on the schema in models/User.ts
+  correctPassword(candidatePassword: string, userPassword: string): Promise<boolean>;
   changedPasswordAfter(JWTTimestamp: number): boolean;
   createPasswordResetToken(): string;
   createEmailVerificationToken(): string;
@@ -255,6 +257,7 @@ export interface ITask extends Document {
   }>;
   completedAt?: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 // API Response Types

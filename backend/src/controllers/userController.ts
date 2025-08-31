@@ -5,13 +5,48 @@ import { catchAsync, CustomError } from '@/middleware/errorHandler';
 
 export const userController = {
   getProfile: catchAsync(async (req: AuthenticatedRequest, res: Response) => {
-    res.status(200).json({ status: 'success', data: { profile: req.user.profile }, timestamp: new Date().toISOString() });
+    const u = req.user;
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: {
+          _id: u._id,
+          name: u.name,
+          email: u.email,
+          avatar: u.avatar,
+          role: u.role,
+          active: u.active,
+          emailVerified: u.emailVerified,
+          preferences: u.preferences,
+          createdAt: u.createdAt,
+          updatedAt: u.updatedAt
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
   }),
 
   updateProfile: catchAsync(async (req: AuthenticatedRequest, res: Response) => {
     const updates = (({ name }) => ({ name }))(req.body);
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true });
-    res.status(200).json({ status: 'success', data: { profile: user?.profile }, timestamp: new Date().toISOString() });
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user: user ? {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          role: user.role,
+          active: (user as any).active,
+          emailVerified: (user as any).emailVerified,
+          preferences: (user as any).preferences,
+          createdAt: (user as any).createdAt,
+          updatedAt: (user as any).updatedAt
+        } : null
+      },
+      timestamp: new Date().toISOString()
+    });
   }),
 
   updateAvatar: catchAsync(async (req: AuthenticatedRequest, res: Response) => {

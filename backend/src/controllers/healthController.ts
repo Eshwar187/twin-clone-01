@@ -26,7 +26,9 @@ export const healthController = {
   }),
 
   updateHealthData: catchAsync(async (req: AuthenticatedRequest, res: Response) => {
-    const date = new Date(req.params.date);
+    const { date: dateParam } = req.params as { date?: string };
+    if (!dateParam) throw new CustomError('Date parameter is required', 400);
+    const date = new Date(dateParam);
     const updated = await HealthData.findOneAndUpdate({ userId: req.user._id, date }, req.body, { new: true, runValidators: true });
     if (!updated) throw new CustomError('Health data not found for date', 404);
     res.status(200).json({ status: 'success', data: updated, timestamp: new Date().toISOString() });

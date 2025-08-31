@@ -1,12 +1,13 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions, Secret } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from '@/models/User';
 import { catchAsync, CustomError } from '@/middleware/errorHandler';
 import { logger } from '@/utils/logger';
 
-const signToken = (id: string, secret: string, expiresIn: string) => {
-  return jwt.sign({ id }, secret, { expiresIn });
+const signToken = (id: string, secret: Secret, expiresIn: string | number) => {
+  const options: SignOptions = { expiresIn: expiresIn as any };
+  return jwt.sign({ id }, secret, options);
 };
 
 const sendAuthResponse = (res: Response, user: any, accessToken: string, refreshToken?: string) => {
@@ -84,7 +85,7 @@ export const authController = {
   }),
 
   resetPassword: catchAsync(async (req: Request, res: Response) => {
-    const { token } = req.params;
+    const { token } = req.params as { token: string };
     const { password } = req.body;
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
@@ -114,7 +115,7 @@ export const authController = {
   }),
 
   verifyEmail: catchAsync(async (req: Request, res: Response) => {
-    const { token } = req.params;
+    const { token } = req.params as { token: string };
     const hashed = crypto.createHash('sha256').update(token).digest('hex');
     const user = await User.findOne({ emailVerificationToken: hashed, emailVerificationExpires: { $gt: Date.now() } });
     if (!user) throw new CustomError('Token is invalid or has expired', 400);

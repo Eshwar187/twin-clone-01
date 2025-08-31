@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +9,38 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 export const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [newEvent, setNewEvent] = useState('');
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL as string | undefined;
+  const token = useMemo(() =>
+    localStorage.getItem('token') || localStorage.getItem('accessToken') || '',
+  []);
 
-  const mockEvents = [
-    { id: 1, title: 'Team Meeting', time: '09:00', date: new Date(), type: 'work' },
-    { id: 2, title: 'Gym Session', time: '18:00', date: new Date(), type: 'health' },
-    { id: 3, title: 'Doctor Appointment', time: '14:30', date: new Date(), type: 'health' },
-  ];
+  const fetchEvents = async (start?: Date, end?: Date) => {
+    if (!API_URL || !token) return;
+    const params = new URLSearchParams();
+    if (start) params.set('start', start.toISOString());
+    if (end) params.set('end', end.toISOString());
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/calendar/events?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const json = await res.json();
+      if (res.ok) setEvents(json.data || []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Load current month range on mount and when selected month changes
+    const base = selectedDate || new Date();
+    const start = new Date(base.getFullYear(), base.getMonth(), 1);
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999);
+    fetchEvents(start, end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate?.getFullYear(), selectedDate?.getMonth()]);
 
   const mockTasks = [
     { id: 1, title: 'Review project proposal', completed: false, priority: 'high' },
@@ -27,6 +53,46 @@ export const Calendar = () => {
     totalTasks: 8,
     focusTime: 4.5,
     meetings: 3
+  };
+
+  const todaysEvents = useMemo(() => {
+    if (!selectedDate) return [] as any[];
+    const y = selectedDate.getFullYear();
+    const m = selectedDate.getMonth();
+    const d = selectedDate.getDate();
+    return events.filter((e) => {
+      const start = new Date(e.startTime);
+      return (
+        start.getFullYear() === y &&
+        start.getMonth() === m &&
+        start.getDate() === d
+      );
+    }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [events, selectedDate]);
+
+  const addQuickEvent = async () => {
+    if (!API_URL || !token || !selectedDate || !newEvent.trim()) return;
+    // Default 1-hour block starting at 09:00 of selected day
+    const start = new Date(selectedDate);
+    start.setHours(9, 0, 0, 0);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const payload = { title: newEvent.trim(), startTime: start, endTime: end, allDay: false, category: 'personal', attendees: [] };
+    const res = await fetch(`${API_URL}/calendar/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      setNewEvent('');
+      // Refresh events for the same range
+      const base = selectedDate || new Date();
+      const startRange = new Date(base.getFullYear(), base.getMonth(), 1);
+      const endRange = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999);
+      fetchEvents(startRange, endRange);
+    }
   };
 
   return (
@@ -67,14 +133,18 @@ export const Calendar = () => {
               <Card className="glass-card p-6">
                 <h2 className="text-xl font-semibold mb-4">Today's Events</h2>
                 <div className="space-y-3">
-                  {mockEvents.map((event) => (
-                    <div key={event.id} className="flex items-center space-x-3 p-3 rounded-lg bg-background/20">
+                  {loading && <div className="text-xs text-muted-foreground">Loading...</div>}
+                  {!loading && todaysEvents.length === 0 && (
+                    <div className="text-xs text-muted-foreground">No events</div>
+                  )}
+                  {todaysEvents.map((event) => (
+                    <div key={event._id} className="flex items-center space-x-3 p-3 rounded-lg bg-background/20">
                       <div className="w-2 h-2 rounded-full bg-primary"></div>
                       <div className="flex-1">
                         <p className="font-medium text-sm">{event.title}</p>
                         <p className="text-xs text-muted-foreground flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          {event.time}
+                          {new Date(event.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>
@@ -89,7 +159,7 @@ export const Calendar = () => {
                       onChange={(e) => setNewEvent(e.target.value)}
                       className="glass-input"
                     />
-                    <Button size="sm" variant="outline">Add</Button>
+                    <Button size="sm" variant="outline" onClick={addQuickEvent} disabled={!newEvent.trim()}>Add</Button>
                   </div>
                 </div>
               </Card>
