@@ -1,18 +1,23 @@
 import mongoose, { ConnectOptions } from 'mongoose';
 import { logger } from '@/utils/logger';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/digital-doppelganger';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 export const connectDatabase = async (): Promise<void> => {
   try {
+    if (!MONGODB_URI) {
+      logger.error('❌ MONGODB_URI environment variable is not set.');
+      process.exit(1);
+    }
+
     const options: ConnectOptions = {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     };
 
-    await mongoose.connect(MONGODB_URI, options);
-    
+    await mongoose.connect(MONGODB_URI as string, options);
+
     logger.info('✅ Connected to MongoDB successfully');
     
     // Handle connection events
