@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [currentModule, setCurrentModule] = useState('dashboard');
-  const [avatarState, setAvatarState] = useState<'happy' | 'stressed' | 'calm' | 'tired' | 'energetic'>('calm');
   const { toast } = useToast();
 
   const handleModuleChange = (module: string) => {
@@ -31,7 +30,6 @@ const Index = () => {
       <Header 
         currentModule={currentModule}
         onModuleChange={handleModuleChange}
-        avatarState={avatarState}
       />
       
       <main>

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,69 +7,78 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Receipt, Plus, Users, DollarSign, QrCode, ArrowUpDown, Clock } from 'lucide-react';
+import { formatAmount } from '@/utils/currency';
 
 export const Bills = () => {
   const [newBillAmount, setNewBillAmount] = useState('');
   const [newBillDescription, setNewBillDescription] = useState('');
+  const { setSignals } = useMood();
 
-  const mockGroups = [
-    { id: 1, name: 'Roommates', members: 4, activeExpenses: 3 },
-    { id: 2, name: 'Trip Friends', members: 6, activeExpenses: 8 },
-    { id: 3, name: 'Office Team', members: 12, activeExpenses: 2 },
-  ];
+  // Backend wiring
+  const API_URL = import.meta.env.VITE_API_URL as string | undefined;
+  const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
 
-  const mockBills = [
-    {
-      id: 1,
-      description: 'Grocery Shopping',
-      amount: 156.50,
+  // Local state derived from backend (fallback to empty arrays)
+  const [groups, setGroups] = useState<Array<{ id: string; name: string; members?: number; activeExpenses?: number }>>([]);
+  const [bills, setBills] = useState<Array<any>>([]);
+  const [settlements, setSettlements] = useState<Array<any>>([]);
+
+  // Fetch initial data
+  useEffect(() => {
+    const token = getToken();
+    if (!API_URL || !token) return;
+    const headers = { Authorization: `Bearer ${token}` } as any;
+    // Groups
+    fetch(`${API_URL}/bills/groups`, { headers })
+      .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
+    // Bills
+    fetch(`${API_URL}/bills/bills`, { headers })
+      .then(r => r.json()).then(j => setBills(j.data || [])).catch(() => {});
+    // Settlements
+    fetch(`${API_URL}/bills/settlements`, { headers })
+      .then(r => r.json()).then(j => setSettlements(j.data || [])).catch(() => {});
+  }, [API_URL]);
+
+  // Create bill (Quick Split) - optimistic update
+  const handleCreateQuickBill = async () => {
+    const amount = parseFloat(newBillAmount);
+    if (!newBillDescription.trim() || isNaN(amount) || amount <= 0) return;
+    const token = getToken();
+    const temp = {
+      id: `tmp-${Date.now()}`,
+      description: newBillDescription.trim(),
+      amount,
       paidBy: 'You',
-      group: 'Roommates',
-      date: '2024-01-15',
+      group: (groups[0]?.name || 'Personal'),
+      date: new Date().toISOString().slice(0, 10),
       status: 'pending',
-      participants: ['Alice', 'Bob', 'Charlie', 'You'],
-      yourShare: 39.13
-    },
-    {
-      id: 2,
-      description: 'Dinner at Italian Restaurant',
-      amount: 240.00,
-      paidBy: 'Alice',
-      group: 'Trip Friends',
-      date: '2024-01-14',
-      status: 'settled',
-      participants: ['Alice', 'Bob', 'David', 'Emma', 'Frank', 'You'],
-      yourShare: 40.00
-    },
-    {
-      id: 3,
-      description: 'Uber to Airport',
-      amount: 45.00,
-      paidBy: 'Bob',
-      group: 'Trip Friends',
-      date: '2024-01-13',
-      status: 'pending',
-      participants: ['Bob', 'You'],
-      yourShare: 22.50
-    },
-    {
-      id: 4,
-      description: 'Netflix Subscription',
-      amount: 15.99,
-      paidBy: 'Charlie',
-      group: 'Roommates',
-      date: '2024-01-12',
-      status: 'pending',
-      participants: ['Alice', 'Bob', 'Charlie', 'You'],
-      yourShare: 4.00
-    }
-  ];
+      participants: ['You'],
+      yourShare: amount
+    } as any;
+    setBills(prev => [temp, ...prev]);
+    setNewBillAmount('');
+    setNewBillDescription('');
 
-  const settlements = [
-    { from: 'You', to: 'Alice', amount: 42.50, status: 'pending' },
-    { from: 'Bob', to: 'You', amount: 18.75, status: 'pending' },
-    { from: 'Charlie', to: 'You', amount: 15.25, status: 'completed' }
-  ];
+    if (!API_URL || !token) return;
+    const payload = {
+      groupId: groups[0]?.id || 'demo',
+      title: temp.description,
+      description: temp.description,
+      totalAmount: amount,
+      participants: [{ userId: 'me', amount }],
+      category: 'general',
+      date: new Date()
+    };
+    try {
+      await fetch(`${API_URL}/bills/bills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+    } catch (_e) {
+      // ignore; backend is mock; keep optimistic entry
+    }
+  };
 
   const totalOwed = settlements
     .filter(s => s.from === 'You' && s.status === 'pending')
@@ -77,6 +87,13 @@ export const Bills = () => {
   const totalOwedToYou = settlements
     .filter(s => s.to === 'You' && s.status === 'pending')
     .reduce((sum, s) => sum + s.amount, 0);
+
+  // Push overdue bills count into mood engine
+  useEffect(() => {
+    const pendingBills = bills.filter(b => b.status === 'pending').length;
+    const pendingSettlements = settlements.filter(s => s.status === 'pending').length;
+    setSignals({ overdueBills: pendingBills + pendingSettlements });
+  }, [bills, settlements, setSignals]);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -104,7 +121,7 @@ export const Bills = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">You Owe</p>
-                    <p className="font-bold text-destructive">${totalOwed.toFixed(2)}</p>
+                    <p className="font-bold text-destructive">{formatAmount(totalOwed)}</p>
                   </div>
                 </div>
               </Card>
@@ -115,8 +132,8 @@ export const Bills = () => {
                     <DollarSign className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Owed to You</p>
-                    <p className="font-bold text-accent">${totalOwedToYou.toFixed(2)}</p>
+                    <div className="text-sm text-muted-foreground">Owed to You</div>
+                    <p className="font-bold text-accent">{formatAmount(totalOwedToYou)}</p>
                   </div>
                 </div>
               </Card>
@@ -128,7 +145,7 @@ export const Bills = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Active Bills</p>
-                    <p className="font-bold text-primary">{mockBills.filter(b => b.status === 'pending').length}</p>
+                    <p className="font-bold text-primary">{bills.filter(b => b.status === 'pending').length}</p>
                   </div>
                 </div>
               </Card>
@@ -139,14 +156,14 @@ export const Bills = () => {
               <Card className="glass-card p-6">
                 <h2 className="text-xl font-semibold mb-4">Recent Bills</h2>
                 <div className="space-y-3">
-                  {mockBills.slice(0, 4).map((bill) => (
+                  {bills.slice(0, 4).map((bill) => (
                     <div key={bill.id} className="flex items-center justify-between p-3 rounded-lg bg-background/20">
                       <div>
                         <p className="font-medium text-sm">{bill.description}</p>
-                        <p className="text-xs text-muted-foreground">{bill.group} • {bill.date}</p>
+                        <p className="text-xs text-muted-foreground">{bill.group || bill.category || '—'} • {bill.date?.slice?.(0,10) || ''}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-sm">${bill.yourShare.toFixed(2)}</p>
+                        <p className="font-bold text-sm">{formatAmount(Number((bill.yourShare ?? bill.amount)) || Number(bill.amount) || 0)}</p>
                         <Badge variant={bill.status === 'settled' ? 'default' : 'secondary'} className="text-xs">
                           {bill.status}
                         </Badge>
@@ -172,7 +189,7 @@ export const Bills = () => {
                     onChange={(e) => setNewBillAmount(e.target.value)}
                     className="glass-input"
                   />
-                  <Button className="w-full neon-button">
+                  <Button className="w-full neon-button" onClick={handleCreateQuickBill}>
                     <Plus className="w-4 h-4 mr-2" />
                     Create & Split Bill
                   </Button>
@@ -181,10 +198,10 @@ export const Bills = () => {
                 <div className="mt-6 pt-4 border-t border-border/50">
                   <h3 className="font-medium mb-3">Your Groups</h3>
                   <div className="space-y-2">
-                    {mockGroups.map((group) => (
+                    {groups.map((group) => (
                       <div key={group.id} className="flex items-center justify-between text-sm">
                         <span>{group.name}</span>
-                        <Badge variant="outline">{group.members} members</Badge>
+                        {group.members ? <Badge variant="outline">{group.members} members</Badge> : null}
                       </div>
                     ))}
                   </div>
@@ -203,15 +220,15 @@ export const Bills = () => {
             </div>
 
             <div className="space-y-4">
-              {mockBills.map((bill) => (
+              {bills.map((bill) => (
                 <Card key={bill.id} className="glass-card p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold">{bill.description}</h3>
-                      <p className="text-sm text-muted-foreground">{bill.group} • {bill.date}</p>
+                      <h3 className="font-semibold">{bill.description || bill.title}</h3>
+                      <p className="text-sm text-muted-foreground">{bill.group || bill.category || '—'} • {bill.date?.slice?.(0,10) || ''}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold">${bill.amount.toFixed(2)}</p>
+                      <p className="text-2xl font-bold">{formatAmount(Number(bill.amount || bill.totalAmount) || 0)}</p>
                       <p className="text-sm text-muted-foreground">Paid by {bill.paidBy}</p>
                     </div>
                   </div>
@@ -225,10 +242,10 @@ export const Bills = () => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {bill.participants.map((participant, index) => (
+                    {(bill.participants || []).map((participant: any, index: number) => (
                       <Badge key={index} variant="outline">
                         <Users className="w-3 h-3 mr-1" />
-                        {participant}
+                        {participant.name || participant.userId || participant}
                       </Badge>
                     ))}
                   </div>
@@ -260,7 +277,7 @@ export const Bills = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mockGroups.map((group) => (
+              {groups.map((group) => (
                 <Card key={group.id} className="glass-card p-6 cursor-pointer hover:scale-[1.02] transition-transform">
                   <div className="flex items-center space-x-3 mb-4">
                     <div className="p-2 rounded-lg bg-primary/20">
@@ -268,14 +285,16 @@ export const Bills = () => {
                     </div>
                     <div>
                       <h3 className="font-semibold">{group.name}</h3>
-                      <p className="text-sm text-muted-foreground">{group.members} members</p>
+                      {group.members ? (
+                        <p className="text-sm text-muted-foreground">{group.members} members</p>
+                      ) : null}
                     </div>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Active expenses</span>
-                      <span className="font-medium">{group.activeExpenses}</span>
+                      <span className="font-medium">{group.activeExpenses ?? 0}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Total this month</span>
@@ -313,7 +332,7 @@ export const Bills = () => {
                     </div>
                     
                     <div className="text-right">
-                      <p className="text-xl font-bold text-warning">${settlement.amount.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-warning">{formatAmount(settlement.amount)}</p>
                       <div className="flex items-center space-x-2 mt-2">
                         <Button size="sm" variant="outline">
                           <QrCode className="w-4 h-4 mr-2" />

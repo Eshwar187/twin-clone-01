@@ -1,5 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Avatar } from './Avatar';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useMood } from '@/context/MoodContext';
 import { 
   Brain, 
   Calendar, 
@@ -15,7 +18,6 @@ import { cn } from '@/lib/utils';
 interface HeaderProps {
   currentModule?: string;
   onModuleChange?: (module: string) => void;
-  avatarState?: 'happy' | 'stressed' | 'calm' | 'tired' | 'energetic';
 }
 
 const navigationItems = [
@@ -29,9 +31,15 @@ const navigationItems = [
 
 export const Header = ({ 
   currentModule = 'dashboard', 
-  onModuleChange,
-  avatarState = 'calm'
+  onModuleChange
 }: HeaderProps) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { mood } = useMood();
+  const authed = !!localStorage.getItem('token');
+  const userName = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}')?.name || 'User'; } catch { return 'User'; }
+  })();
   return (
     <header className="sticky top-0 z-50 glass-card border-b border-border/50 backdrop-blur-xl">
       <div className="container mx-auto px-6 py-4">
@@ -67,15 +75,25 @@ export const Header = ({
             ))}
           </nav>
 
-          {/* Avatar & Actions */}
+          {/* Auth & Actions */}
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
-              <Settings className="w-4 h-4" />
-            </Button>
-            <Avatar state={avatarState} size="sm" />
-            <Button variant="ghost" size="sm" className="md:hidden">
-              <Menu className="w-4 h-4" />
-            </Button>
+            {!authed ? (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>Login</Button>
+                <Button size="sm" onClick={() => navigate('/register')}>Sign up</Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-4 h-4" />
+                </Button>
+                <Avatar state={mood} size="sm" name={userName} showCaption={false} />
+                <Button variant="outline" size="sm" onClick={() => { logout(); navigate('/login'); }}>Logout</Button>
+                <Button variant="ghost" size="sm" className="md:hidden">
+                  <Menu className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

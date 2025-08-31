@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +13,11 @@ export const Calendar = () => {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const API_URL = import.meta.env.VITE_API_URL as string | undefined;
-  const token = useMemo(() =>
-    localStorage.getItem('token') || localStorage.getItem('accessToken') || '',
-  []);
+  const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
+  const { setSignals } = useMood();
 
   const fetchEvents = async (start?: Date, end?: Date) => {
+    const token = getToken();
     if (!API_URL || !token) return;
     const params = new URLSearchParams();
     if (start) params.set('start', start.toISOString());
@@ -70,7 +71,14 @@ export const Calendar = () => {
     }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [events, selectedDate]);
 
+  // Feed schedule and todo signals
+  useEffect(() => {
+    const eventsCount = todaysEvents.length;
+    setSignals({ eventsToday: eventsCount });
+  }, [todaysEvents.length, setSignals]);
+
   const addQuickEvent = async () => {
+    const token = getToken();
     if (!API_URL || !token || !selectedDate || !newEvent.trim()) return;
     // Default 1-hour block starting at 09:00 of selected day
     const start = new Date(selectedDate);

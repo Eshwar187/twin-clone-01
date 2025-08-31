@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ export const Health = () => {
   const [waterCount, setWaterCount] = useState(6);
   const [sleepHours, setSleepHours] = useState(7.5);
   const [steps, setSteps] = useState(8432);
+  const { setSignals } = useMood();
 
   const healthStats = {
     waterGoal: 8,
@@ -28,6 +30,16 @@ export const Health = () => {
     { day: 'Sat', sleep: 9, water: 8, steps: 12000 },
     { day: 'Sun', sleep: 8.5, water: 7, steps: 9200 },
   ];
+
+  // Push health signals to global mood engine
+  useEffect(() => {
+    setSignals({
+      waterCups: waterCount,
+      sleepHours,
+      steps,
+      wellnessScore: 8.2,
+    });
+  }, [waterCount, sleepHours, steps, setSignals]);
 
   const habits = [
     { id: 1, name: 'Morning Meditation', streak: 15, completed: true },

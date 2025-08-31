@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { formatAmount } from '@/utils/currency';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -21,6 +23,7 @@ import {
 export const Budget = () => {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [newExpenseCategory, setNewExpenseCategory] = useState('');
+  const { setSignals } = useMood();
 
   const budgetData = {
     totalBudget: 2500,
@@ -66,6 +69,11 @@ export const Budget = () => {
 
   const budgetPercentage = (budgetData.totalSpent / budgetData.totalBudget) * 100;
 
+  // Push finance signal to mood engine
+  useEffect(() => {
+    setSignals({ budgetUsed: budgetPercentage });
+  }, [budgetPercentage, setSignals]);
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="container mx-auto max-w-7xl">
@@ -92,7 +100,7 @@ export const Budget = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Monthly Budget</p>
-                    <p className="font-bold text-primary">${budgetData.totalBudget.toLocaleString()}</p>
+                    <p className="font-bold text-primary">{formatAmount(budgetData.totalBudget)}</p>
                   </div>
                 </div>
               </Card>
@@ -104,7 +112,7 @@ export const Budget = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Spent</p>
-                    <p className="font-bold text-destructive">${budgetData.totalSpent.toLocaleString()}</p>
+                    <p className="font-bold text-destructive">{formatAmount(budgetData.totalSpent)}</p>
                   </div>
                 </div>
               </Card>
@@ -116,7 +124,7 @@ export const Budget = () => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Remaining</p>
-                    <p className="font-bold text-accent">${(budgetData.totalBudget - budgetData.totalSpent).toLocaleString()}</p>
+                    <p className="font-bold text-accent">{formatAmount(budgetData.totalBudget - budgetData.totalSpent)}</p>
                   </div>
                 </div>
               </Card>
@@ -132,8 +140,8 @@ export const Budget = () => {
               </div>
               <Progress value={budgetPercentage} className="h-4 mb-2" />
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>${budgetData.totalSpent.toLocaleString()} spent</span>
-                <span>${budgetData.totalBudget.toLocaleString()} budget</span>
+                <span>{formatAmount(budgetData.totalSpent)} spent</span>
+                <span>{formatAmount(budgetData.totalBudget)} budget</span>
               </div>
             </Card>
 
@@ -154,7 +162,7 @@ export const Budget = () => {
                             <span className="text-sm font-medium">{category.name}</span>
                           </div>
                           <span className="text-sm text-muted-foreground">
-                            ${category.spent} / ${category.budget}
+                            {formatAmount(category.spent)} / {formatAmount(category.budget)}
                           </span>
                         </div>
                         <Progress value={percentage} className="h-2" />
@@ -192,7 +200,7 @@ export const Budget = () => {
                     {recentExpenses.slice(0, 3).map((expense) => (
                       <div key={expense.id} className="flex items-center justify-between text-sm">
                         <span className="line-clamp-1">{expense.description}</span>
-                        <span className="font-medium">${expense.amount}</span>
+                        <span className="font-medium">{formatAmount(expense.amount)}</span>
                       </div>
                     ))}
                   </div>
@@ -238,8 +246,8 @@ export const Budget = () => {
                     <div className="mb-4">
                       <Progress value={percentage} className="h-3" />
                       <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                        <span>${category.spent}</span>
-                        <span>${category.budget}</span>
+                        <span>{formatAmount(category.spent)}</span>
+                        <span>{formatAmount(category.budget)}</span>
                       </div>
                     </div>
 
@@ -276,7 +284,7 @@ export const Budget = () => {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-lg">${expense.amount}</p>
+                      <p className="font-bold text-lg">{formatAmount(expense.amount)}</p>
                       <Button size="sm" variant="outline">Edit</Button>
                     </div>
                   </div>

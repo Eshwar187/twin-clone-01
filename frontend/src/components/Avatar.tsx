@@ -8,6 +8,7 @@ interface AvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   name?: string;
+  showCaption?: boolean;
 }
 
 const avatarEmojis = {
@@ -25,7 +26,7 @@ const sizeClasses = {
   xl: 'w-32 h-32 text-7xl'
 };
 
-export const Avatar = ({ state, size = 'lg', className, name = 'Alex' }: AvatarProps) => {
+export const Avatar = ({ state, size = 'lg', className, name = 'Alex', showCaption = true }: AvatarProps) => {
   const [currentState, setCurrentState] = useState<AvatarState>(state);
 
   useEffect(() => {
@@ -64,12 +65,14 @@ export const Avatar = ({ state, size = 'lg', className, name = 'Alex' }: AvatarP
         />
       </div>
       
-      <div className="text-center">
-        <p className="text-foreground font-medium">{name}</p>
-        <p className="text-muted-foreground text-sm capitalize font-mono">
-          {currentState}
-        </p>
-      </div>
+      {showCaption && (
+        <div className="text-center">
+          <p className="text-foreground font-medium">{name}</p>
+          <p className="text-muted-foreground text-sm capitalize font-mono">
+            {currentState}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

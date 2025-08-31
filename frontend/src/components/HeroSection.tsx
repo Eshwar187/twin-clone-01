@@ -1,4 +1,5 @@
 import { Avatar } from './Avatar';
+import { useMood } from '@/context/MoodContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Zap, Brain, Heart, TrendingUp } from 'lucide-react';
@@ -6,12 +7,15 @@ import heroImage from '@/assets/hero-avatar.jpg';
 
 interface HeroSectionProps {
   currentTime: Date;
-  avatarState: 'happy' | 'stressed' | 'calm' | 'tired' | 'energetic';
   onQuickAction?: (action: string) => void;
 }
 
-export const HeroSection = ({ currentTime, avatarState, onQuickAction }: HeroSectionProps) => {
+export const HeroSection = ({ currentTime, onQuickAction }: HeroSectionProps) => {
   const greeting = currentTime.getHours() < 12 ? 'Morning' : currentTime.getHours() < 18 ? 'Afternoon' : 'Evening';
+  const userName = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || '{}')?.name || 'User'; } catch { return 'User'; }
+  })();
+  const { mood } = useMood();
   
   return (
     <section className="relative py-16 px-6 overflow-hidden">
@@ -30,7 +34,7 @@ export const HeroSection = ({ currentTime, avatarState, onQuickAction }: HeroSec
           {/* Left Side - Avatar & Welcome */}
           <div className="text-center lg:text-left space-y-6">
             <div className="flex justify-center lg:justify-start">
-              <Avatar state={avatarState} size="xl" name="Alex" />
+              <Avatar state={mood} size="xl" name={userName} />
             </div>
             
             <div className="space-y-4">

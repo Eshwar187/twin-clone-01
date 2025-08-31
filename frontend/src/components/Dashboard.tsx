@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMood } from '@/context/MoodContext';
 import { ModuleCard } from './ModuleCard';
 import { HeroSection } from './HeroSection';
 import { useToast } from '@/hooks/use-toast';
@@ -24,8 +25,8 @@ interface DashboardProps {
 
 export const Dashboard = ({ onModuleSelect }: DashboardProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [avatarState, setAvatarState] = useState<'happy' | 'stressed' | 'calm' | 'tired' | 'energetic'>('calm');
   const { toast } = useToast();
+  const { setSignals } = useMood();
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -49,23 +50,19 @@ export const Dashboard = ({ onModuleSelect }: DashboardProps) => {
     }
   };
 
-  // Calculate avatar state based on mock data
+  // Feed multi-domain signals to global mood engine
   useEffect(() => {
-    const { sleep, water } = mockData.health;
-    const { budgetUsed } = mockData.finance;
-    
-    if (budgetUsed > 90) {
-      setAvatarState('stressed');
-    } else if (sleep < 6) {
-      setAvatarState('tired');
-    } else if (water >= 8 && sleep >= 8) {
-      setAvatarState('energetic');
-    } else if (sleep >= 7 && water >= 6) {
-      setAvatarState('happy');
-    } else {
-      setAvatarState('calm');
-    }
-  }, []);
+    setSignals({
+      budgetUsed: mockData.finance.budgetUsed,
+      overdueBills: mockData.finance.splitBills, // treat split bills as pending bills for now
+      sleepHours: mockData.health.sleep,
+      waterCups: mockData.health.water,
+      steps: mockData.health.steps,
+      tasksCompleted: mockData.productivity.tasksCompleted,
+      totalTasks: mockData.productivity.totalTasks,
+      eventsToday: 4, // placeholder; wire to calendar count when available
+    });
+  }, [setSignals]);
 
   const handleQuickAction = (action: string) => {
     toast({
@@ -79,7 +76,6 @@ export const Dashboard = ({ onModuleSelect }: DashboardProps) => {
       {/* Hero Section */}
       <HeroSection 
         currentTime={currentTime}
-        avatarState={avatarState}
         onQuickAction={handleQuickAction}
       />
 

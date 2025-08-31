@@ -1,10 +1,9 @@
 import mongoose, { ConnectOptions } from 'mongoose';
 import { logger } from '@/utils/logger';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-
 export const connectDatabase = async (): Promise<void> => {
   try {
+    const MONGODB_URI = process.env.MONGODB_URI;
     if (!MONGODB_URI) {
       logger.error('❌ MONGODB_URI environment variable is not set.');
       process.exit(1);
