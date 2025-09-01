@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,54 +27,100 @@ export const Budget = () => {
   const [newExpenseCategory, setNewExpenseCategory] = useState('');
   const { setSignals } = useMood();
 
-  const budgetData = {
-    totalBudget: 2500,
-    totalSpent: 1890,
-    categories: [
-      { name: 'Food & Dining', budget: 600, spent: 485, icon: Coffee, color: 'text-orange-500' },
-      { name: 'Transportation', budget: 300, spent: 245, icon: Car, color: 'text-blue-500' },
-      { name: 'Shopping', budget: 400, spent: 380, icon: ShoppingCart, color: 'text-purple-500' },
-      { name: 'Housing', budget: 800, spent: 550, icon: Home, color: 'text-green-500' },
-      { name: 'Entertainment', budget: 200, spent: 125, icon: Coffee, color: 'text-pink-500' },
-      { name: 'Utilities', budget: 200, spent: 105, icon: Home, color: 'text-yellow-500' }
-    ]
-  };
+  // ZERO defaults for new accounts
+  const [budgetData, setBudgetData] = useState({
+    totalBudget: 0,
+    totalSpent: 0,
+    categories: [] as Array<{ name: string; budget: number; spent: number; icon: any; color: string }>,
+  });
 
-  const recentExpenses = [
-    { id: 1, description: 'Grocery Store', amount: 85.50, category: 'Food & Dining', date: '2024-01-15' },
-    { id: 2, description: 'Gas Station', amount: 45.00, category: 'Transportation', date: '2024-01-15' },
-    { id: 3, description: 'Amazon Purchase', amount: 67.99, category: 'Shopping', date: '2024-01-14' },
-    { id: 4, description: 'Restaurant Dinner', amount: 42.75, category: 'Food & Dining', date: '2024-01-14' },
-    { id: 5, description: 'Movie Tickets', amount: 28.00, category: 'Entertainment', date: '2024-01-13' }
-  ];
+  const [recentExpenses, setRecentExpenses] = useState<Array<{ id: string | number; description: string; amount: number; category: string; date: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
 
-  const insights = [
-    {
-      type: 'warning',
-      title: 'Shopping Budget Alert',
-      message: 'You\'ve used 95% of your shopping budget. Consider reducing spending in this category.',
-      action: 'Review spending'
-    },
-    {
-      type: 'success',
-      title: 'Great Progress!',
-      message: 'You\'re 20% under budget for utilities this month. Keep it up!',
-      action: 'View trends'
-    },
-    {
-      type: 'tip',
-      title: 'Savings Opportunity',
-      message: 'Based on your patterns, you could save $200/month by meal prepping.',
-      action: 'Learn more'
-    }
-  ];
+  // Optionally show empty insights for new users
+  const insights: Array<{ type: 'warning' | 'success' | 'tip'; title: string; message: string; action: string }> = [];
 
-  const budgetPercentage = (budgetData.totalSpent / budgetData.totalBudget) * 100;
+  const budgetPercentage = budgetData.totalBudget > 0
+    ? (budgetData.totalSpent / budgetData.totalBudget) * 100
+    : 0;
+
+  // Load budget from backend (if available). Keeps zeros for new users.
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return; // guarded by ProtectedRoute, but keep safe
+    (async () => {
+      setLoading(true);
+      try {
+        // These endpoints are hypothetical; if backend 404s, we keep zeros.
+        const [sumRes, catRes, expRes] = await Promise.allSettled([
+          api.get('/budget/summary'),
+          api.get('/budget/categories'),
+          api.get('/budget/expenses?limit=5'),
+        ]);
+
+        if (sumRes.status === 'fulfilled' && sumRes.value.ok) {
+          const j = await sumRes.value.json();
+          const summary = j?.data || {};
+          setBudgetData(prev => ({ ...prev, totalBudget: summary.totalBudget || 0, totalSpent: summary.totalSpent || 0 }));
+        }
+        if (catRes.status === 'fulfilled' && catRes.value.ok) {
+          const j = await catRes.value.json();
+          const cats = (j?.data || []).map((c: any) => ({
+            name: c.name,
+            budget: c.budget || 0,
+            spent: c.spent || 0,
+            icon: (c.icon === 'Car' ? Car : c.icon === 'Home' ? Home : c.icon === 'ShoppingCart' ? ShoppingCart : Coffee),
+            color: c.color || 'text-primary',
+          }));
+          setBudgetData(prev => ({ ...prev, categories: cats }));
+        }
+        if (expRes.status === 'fulfilled' && expRes.value.ok) {
+          const j = await expRes.value.json();
+          const exps = (j?.data || []).map((e: any, idx: number) => ({
+            id: e.id || idx,
+            description: e.description || 'Expense',
+            amount: e.amount || 0,
+            category: e.category || 'General',
+            date: e.date || new Date().toISOString().slice(0, 10),
+          }));
+          setRecentExpenses(exps);
+        }
+      } catch {
+        // keep zeros
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   // Push finance signal to mood engine
   useEffect(() => {
     setSignals({ budgetUsed: budgetPercentage });
   }, [budgetPercentage, setSignals]);
+
+  const handleQuickAdd = async () => {
+    const token = getToken();
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to add expenses.', variant: 'destructive' as any });
+      return;
+    }
+    const amount = parseFloat(newExpenseAmount);
+    if (!newExpenseCategory.trim() || isNaN(amount) || amount <= 0) return;
+    const payload = { description: newExpenseCategory.trim(), amount, category: newExpenseCategory.trim(), date: new Date().toISOString() };
+    try {
+      const res = await api.post('/budget/expenses', payload);
+      if (res.ok) {
+        setRecentExpenses(prev => [{ id: `tmp-${Date.now()}`, ...payload }, ...prev].slice(0, 5));
+        setNewExpenseAmount('');
+        setNewExpenseCategory('');
+        // Optionally update totals locally
+        setBudgetData(prev => ({ ...prev, totalSpent: (prev.totalSpent || 0) + amount }));
+      }
+    } catch {
+      // No-op; if endpoint doesn't exist, we simply do nothing
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -188,7 +236,7 @@ export const Budget = () => {
                     onChange={(e) => setNewExpenseAmount(e.target.value)}
                     className="glass-input"
                   />
-                  <Button className="w-full neon-button">
+                  <Button className="w-full neon-button" onClick={handleQuickAdd} disabled={loading}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Expense
                   </Button>

@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,27 +10,29 @@ import { Progress } from '@/components/ui/progress';
 import { Heart, Droplets, Moon, Activity, Plus, Target, TrendingUp } from 'lucide-react';
 
 export const Health = () => {
-  const [waterCount, setWaterCount] = useState(6);
-  const [sleepHours, setSleepHours] = useState(7.5);
-  const [steps, setSteps] = useState(8432);
+  const [waterCount, setWaterCount] = useState(0);
+  const [sleepHours, setSleepHours] = useState(0);
+  const [steps, setSteps] = useState(0);
   const { setSignals } = useMood();
+  const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
+  const [savingWater, setSavingWater] = useState(false);
 
   const healthStats = {
     waterGoal: 8,
     sleepGoal: 8,
     stepsGoal: 10000,
-    workoutStreak: 12,
-    caloriesBurned: 245
+    workoutStreak: 0,
+    caloriesBurned: 0
   };
 
   const weeklyData = [
-    { day: 'Mon', sleep: 7, water: 8, steps: 9500 },
-    { day: 'Tue', sleep: 6.5, water: 6, steps: 7200 },
-    { day: 'Wed', sleep: 8, water: 9, steps: 11000 },
-    { day: 'Thu', sleep: 7.5, water: 7, steps: 8900 },
-    { day: 'Fri', sleep: 6, water: 5, steps: 6800 },
-    { day: 'Sat', sleep: 9, water: 8, steps: 12000 },
-    { day: 'Sun', sleep: 8.5, water: 7, steps: 9200 },
+    { day: 'Mon', sleep: 0, water: 0, steps: 0 },
+    { day: 'Tue', sleep: 0, water: 0, steps: 0 },
+    { day: 'Wed', sleep: 0, water: 0, steps: 0 },
+    { day: 'Thu', sleep: 0, water: 0, steps: 0 },
+    { day: 'Fri', sleep: 0, water: 0, steps: 0 },
+    { day: 'Sat', sleep: 0, water: 0, steps: 0 },
+    { day: 'Sun', sleep: 0, water: 0, steps: 0 },
   ];
 
   // Push health signals to global mood engine
@@ -40,6 +44,93 @@ export const Health = () => {
       wellnessScore: 8.2,
     });
   }, [waterCount, sleepHours, steps, setSignals]);
+
+  // Load latest/today's data from backend
+  useEffect(() => {
+    const fetchLatest = async () => {
+      const token = getToken();
+      if (!token) {
+        toast({ title: 'Login required', description: 'Sign in to sync health data.', variant: 'destructive' as any });
+        return;
+      }
+      try {
+        const res = await api.get('/health/dashboard');
+        const json = await res.json();
+        if (res.ok && json?.data?.latest) {
+          const latest = json.data.latest;
+          if (latest?.water?.consumed != null) setWaterCount(latest.water.consumed);
+          if (latest?.sleep?.hours != null) setSleepHours(latest.sleep.hours);
+          if (latest?.exercise?.steps != null) setSteps(latest.exercise.steps);
+        }
+      } catch (e) {
+        // silent fail to keep UI usable offline
+      }
+    };
+    fetchLatest();
+  }, []);
+
+  // Helpers: optimistic water update
+  const mutateWater = async (delta: number) => {
+    const token = getToken();
+    if (!token || savingWater) {
+      if (!token) toast({ title: 'Login required', description: 'Sign in to update water intake.', variant: 'destructive' as any });
+      return;
+    }
+    setSavingWater(true);
+    if (delta > 0) {
+      // optimistic increase
+      setWaterCount((p) => Math.max(0, p + delta));
+      try {
+        const res = await api.post('/health/water', { amount: delta });
+        if (!res.ok) setWaterCount((p) => Math.max(0, p - delta));
+      } catch {
+        setWaterCount((p) => Math.max(0, p - delta));
+      } finally {
+        setSavingWater(false);
+      }
+      return;
+    }
+
+    // Decrement path: persist absolute consumed via PATCH /health/data/:date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateKey = today.toISOString();
+    let target = 0;
+    setWaterCount((p) => { target = Math.max(0, p + delta); return target; });
+    try {
+      const res = await api.patch(`/health/data/${encodeURIComponent(dateKey)}`, { water: { consumed: target } });
+      if (!res.ok) setWaterCount((p) => Math.max(0, p - delta));
+    } catch {
+      setWaterCount((p) => Math.max(0, p - delta));
+    } finally {
+      setSavingWater(false);
+    }
+  };
+
+  // Debounce helpers for sleep and steps
+  const debounce = (fn: (...a: any[]) => void, ms = 500) => {
+    let t: any;
+    return (...a: any[]) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...a), ms);
+    };
+  };
+
+  const persistSleep = useMemo(() => debounce(async (hours: number) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.post('/health/sleep', { hours, quality: 4 });
+    } catch {}
+  }, 600), []);
+
+  const persistSteps = useMemo(() => debounce(async (val: number) => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      await api.post('/health/exercise', { steps: val });
+    } catch {}
+  }, 600), []);
 
   const habits = [
     { id: 1, name: 'Morning Meditation', streak: 15, completed: true },
@@ -75,7 +166,7 @@ export const Health = () => {
                       <p className="font-bold text-accent">{waterCount}/{healthStats.waterGoal} cups</p>
                     </div>
                   </div>
-                  <Button size="sm" onClick={() => setWaterCount(prev => Math.min(prev + 1, healthStats.waterGoal))}>
+                  <Button size="sm" onClick={() => mutateWater(1)} disabled={savingWater}>
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -124,9 +215,9 @@ export const Health = () => {
                   <div className="flex items-center justify-between p-3 rounded-lg bg-background/20">
                     <span>Water Intake</span>
                     <div className="flex items-center space-x-2">
-                      <Button size="sm" variant="outline" onClick={() => setWaterCount(prev => Math.max(prev - 1, 0))}>-</Button>
+                      <Button size="sm" variant="outline" onClick={() => mutateWater(-1)} disabled={savingWater}>-</Button>
                       <span className="w-8 text-center">{waterCount}</span>
-                      <Button size="sm" variant="outline" onClick={() => setWaterCount(prev => prev + 1)}>+</Button>
+                      <Button size="sm" variant="outline" onClick={() => mutateWater(1)} disabled={savingWater}>+</Button>
                     </div>
                   </div>
                   
@@ -135,7 +226,7 @@ export const Health = () => {
                     <Input
                       type="number"
                       value={sleepHours}
-                      onChange={(e) => setSleepHours(parseFloat(e.target.value))}
+                      onChange={(e) => { const v = parseFloat(e.target.value); setSleepHours(v); persistSleep(v); }}
                       className="w-20 glass-input"
                       step="0.5"
                     />
@@ -146,7 +237,7 @@ export const Health = () => {
                     <Input
                       type="number"
                       value={steps}
-                      onChange={(e) => setSteps(parseInt(e.target.value))}
+                      onChange={(e) => { const v = parseInt(e.target.value); setSteps(v); persistSteps(v); }}
                       className="w-24 glass-input"
                     />
                   </div>

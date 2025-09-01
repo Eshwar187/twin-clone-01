@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,21 +14,21 @@ export const Calendar = () => {
   const [newEvent, setNewEvent] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const API_URL = import.meta.env.VITE_API_URL as string | undefined;
   const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
   const { setSignals } = useMood();
 
   const fetchEvents = async (start?: Date, end?: Date) => {
     const token = getToken();
-    if (!API_URL || !token) return;
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to view your events.', variant: 'destructive' as any });
+      return;
+    }
     const params = new URLSearchParams();
     if (start) params.set('start', start.toISOString());
     if (end) params.set('end', end.toISOString());
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/calendar/events?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/calendar/events?${params.toString()}`);
       const json = await res.json();
       if (res.ok) setEvents(json.data || []);
     } finally {
@@ -79,20 +81,16 @@ export const Calendar = () => {
 
   const addQuickEvent = async () => {
     const token = getToken();
-    if (!API_URL || !token || !selectedDate || !newEvent.trim()) return;
+    if (!token || !selectedDate) {
+      if (!token) toast({ title: 'Login required', description: 'Sign in to add events.', variant: 'destructive' as any });
+      return;
+    }
     // Default 1-hour block starting at 09:00 of selected day
     const start = new Date(selectedDate);
     start.setHours(9, 0, 0, 0);
     const end = new Date(start.getTime() + 60 * 60 * 1000);
-    const payload = { title: newEvent.trim(), startTime: start, endTime: end, allDay: false, category: 'personal', attendees: [] };
-    const res = await fetch(`${API_URL}/calendar/events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
+    const payload = { title: (newEvent.trim() || 'New Event'), startTime: start, endTime: end, allDay: false, category: 'personal', attendees: [] };
+    const res = await api.post('/calendar/events', payload);
     if (res.ok) {
       setNewEvent('');
       // Refresh events for the same range
@@ -124,7 +122,7 @@ export const Calendar = () => {
               <Card className="glass-card p-6 lg:col-span-2">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Schedule</h2>
-                  <Button size="sm" className="neon-button">
+                  <Button size="sm" className="neon-button" onClick={addQuickEvent}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Event
                   </Button>
@@ -167,7 +165,7 @@ export const Calendar = () => {
                       onChange={(e) => setNewEvent(e.target.value)}
                       className="glass-input"
                     />
-                    <Button size="sm" variant="outline" onClick={addQuickEvent} disabled={!newEvent.trim()}>Add</Button>
+                    <Button size="sm" variant="outline" onClick={addQuickEvent}>Add</Button>
                   </div>
                 </div>
               </Card>

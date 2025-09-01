@@ -105,7 +105,7 @@ const userSchema = new Schema<IUser>({
 });
 
 // Indexes
-userSchema.index({ email: 1 });
+// 'email' already has `unique: true` on the schema field; avoid duplicate index definition
 userSchema.index({ active: 1 });
 userSchema.index({ emailVerified: 1 });
 

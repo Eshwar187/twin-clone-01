@@ -4,18 +4,21 @@ import { logger } from '@/utils/logger';
 export const connectDatabase = async (): Promise<void> => {
   try {
     const MONGODB_URI = process.env.MONGODB_URI;
+    const DB_NAME = process.env.DB_NAME; // optional explicit DB name
     if (!MONGODB_URI) {
       logger.error('❌ MONGODB_URI environment variable is not set.');
       process.exit(1);
     }
 
-    const options: ConnectOptions = {
+    const baseOptions: ConnectOptions = {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     };
 
-    await mongoose.connect(MONGODB_URI as string, options);
+    const optionsWithDb = DB_NAME ? ({ ...baseOptions, dbName: DB_NAME } as ConnectOptions) : baseOptions;
+
+    await mongoose.connect(MONGODB_URI as string, optionsWithDb);
 
     logger.info('✅ Connected to MongoDB successfully');
     

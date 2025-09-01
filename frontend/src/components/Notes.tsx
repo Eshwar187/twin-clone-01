@@ -5,12 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Plus, Search, Star, Calendar, Hash, Edit3 } from 'lucide-react';
+import { FileText, Plus, Search, Star, Calendar, Hash, Edit3, CheckSquare, Trash } from 'lucide-react';
 
 export const Notes = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [newNote, setNewNote] = useState('');
   const [selectedNote, setSelectedNote] = useState<number | null>(null);
+  // Simple To-Do state
+  const [todoText, setTodoText] = useState('');
+  const [todos, setTodos] = useState<Array<{ id: number; text: string; done: boolean }>>([
+    { id: 1, text: 'Plan weekly tasks', done: false },
+    { id: 2, text: 'Review budget updates', done: true },
+  ]);
 
   const mockNotes = [
     {
@@ -73,15 +79,14 @@ export const Notes = () => {
     <div className="min-h-screen bg-background p-6">
       <div className="container mx-auto max-w-7xl">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold gradient-text mb-2">Notes & Journal</h1>
-          <p className="text-muted-foreground">Capture thoughts, ideas, and daily reflections</p>
+          <h1 className="text-3xl font-bold gradient-text mb-2">Notes & To‑Do</h1>
+          <p className="text-muted-foreground">Capture thoughts and keep track of tasks</p>
         </div>
 
         <Tabs defaultValue="notes" className="space-y-6">
           <TabsList className="glass-card">
             <TabsTrigger value="notes">All Notes</TabsTrigger>
-            <TabsTrigger value="journal">Journal</TabsTrigger>
-            <TabsTrigger value="favorites">Favorites</TabsTrigger>
+            <TabsTrigger value="todo">To‑Do List</TabsTrigger>
           </TabsList>
 
           <TabsContent value="notes" className="space-y-6">
@@ -193,81 +198,63 @@ export const Notes = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="journal" className="space-y-6">
+          <TabsContent value="todo" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="glass-card p-6">
-                <h2 className="text-xl font-semibold mb-4">Today's Reflection</h2>
-                <Textarea
-                  placeholder="How was your day? What are you thinking about?"
-                  className="glass-input min-h-48 resize-none"
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                />
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-sm text-muted-foreground">
-                    {new Date().toLocaleDateString()}
-                  </span>
-                  <Button size="sm" className="neon-button">Save Entry</Button>
+                <h2 className="text-xl font-semibold mb-4">To‑Do List</h2>
+                <div className="flex items-center space-x-2 mb-4">
+                  <Input
+                    placeholder="Add a task..."
+                    value={todoText}
+                    onChange={(e) => setTodoText(e.target.value)}
+                    className="glass-input"
+                  />
+                  <Button
+                    size="sm"
+                    className="neon-button"
+                    onClick={() => {
+                      const t = todoText.trim();
+                      if (!t) return;
+                      setTodos((prev) => [{ id: Date.now(), text: t, done: false }, ...prev]);
+                      setTodoText('');
+                    }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {todos.map((td) => (
+                    <div key={td.id} className="flex items-center justify-between p-3 rounded-lg bg-background/20">
+                      <div className="flex items-center space-x-3">
+                        <button
+                          className={`w-5 h-5 rounded border border-border/50 flex items-center justify-center ${td.done ? 'bg-primary/60' : 'bg-transparent'}`}
+                          onClick={() => setTodos((prev) => prev.map((x) => x.id === td.id ? { ...x, done: !x.done } : x))}
+                          aria-label={td.done ? 'Mark as incomplete' : 'Mark as complete'}
+                        >
+                          {td.done ? <CheckSquare className="w-3 h-3 text-background" /> : null}
+                        </button>
+                        <span className={`text-sm ${td.done ? 'line-through text-muted-foreground' : ''}`}>{td.text}</span>
+                      </div>
+                      <Button size="icon" variant="outline" onClick={() => setTodos((prev) => prev.filter((x) => x.id !== td.id))}>
+                        <Trash className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  {todos.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">All caught up. Add your first task!</div>
+                  ) : null}
                 </div>
               </Card>
 
               <Card className="glass-card p-6">
-                <h2 className="text-xl font-semibold mb-4">Journal Prompts</h2>
-                <div className="space-y-3">
-                  {journalPrompts.map((prompt, index) => (
-                    <div
-                      key={index}
-                      className="p-3 rounded-lg bg-background/20 cursor-pointer hover:bg-background/30 transition-colors"
-                      onClick={() => setNewNote(prompt + '\n\n')}
-                    >
-                      <p className="text-sm">{prompt}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-border/50">
-                  <h3 className="font-medium mb-3">Recent Entries</h3>
-                  <div className="space-y-2">
-                    {mockNotes
-                      .filter(note => note.tags.includes('journal'))
-                      .slice(0, 3)
-                      .map((note) => (
-                        <div key={note.id} className="flex items-center justify-between text-sm">
-                          <span className="line-clamp-1">{note.title}</span>
-                          <span className="text-muted-foreground">{note.date}</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
+                <h2 className="text-xl font-semibold mb-4">Tips</h2>
+                <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+                  <li>Keep tasks small and actionable.</li>
+                  <li>Prioritize 3 most important tasks daily.</li>
+                  <li>Review and reflect at the end of the day.</li>
+                </ul>
               </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="favorites" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {mockNotes
-                .filter(note => note.favorite)
-                .map((note) => (
-                  <Card key={note.id} className="glass-card p-4 cursor-pointer hover:scale-[1.02] transition-transform">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-semibold line-clamp-1">{note.title}</h3>
-                      <Star className="w-4 h-4 text-warning fill-warning" />
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-3 mb-3">
-                      {note.content}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{note.date}</span>
-                      <div className="flex flex-wrap gap-1">
-                        {note.tags.slice(0, 2).map((tag) => (
-                          <Badge key={tag} variant="outline" className="text-xs px-1">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </Card>
-                ))}
             </div>
           </TabsContent>
         </Tabs>

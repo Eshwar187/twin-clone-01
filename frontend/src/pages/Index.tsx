@@ -15,14 +15,6 @@ const Index = () => {
 
   const handleModuleChange = (module: string) => {
     setCurrentModule(module);
-    
-    // Show coming soon toast for non-dashboard modules
-    if (module !== 'dashboard') {
-      toast({
-        title: `${module.charAt(0).toUpperCase() + module.slice(1)} Module`,
-        description: "This feature is coming soon! Connect to Supabase to enable full functionality.",
-      });
-    }
   };
 
   return (

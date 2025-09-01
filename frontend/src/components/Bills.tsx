@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { useMood } from '@/context/MoodContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,10 +14,11 @@ import { formatAmount } from '@/utils/currency';
 export const Bills = () => {
   const [newBillAmount, setNewBillAmount] = useState('');
   const [newBillDescription, setNewBillDescription] = useState('');
+  const [participantsInput, setParticipantsInput] = useState('You, Friend');
+  const [showAddForm, setShowAddForm] = useState(false);
   const { setSignals } = useMood();
 
   // Backend wiring
-  const API_URL = import.meta.env.VITE_API_URL as string | undefined;
   const getToken = () => localStorage.getItem('token') || localStorage.getItem('accessToken') || '';
 
   // Local state derived from backend (fallback to empty arrays)
@@ -26,24 +29,41 @@ export const Bills = () => {
   // Fetch initial data
   useEffect(() => {
     const token = getToken();
-    if (!API_URL || !token) return;
-    const headers = { Authorization: `Bearer ${token}` } as any;
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to load your bills.', variant: 'destructive' as any });
+      return;
+    }
     // Groups
-    fetch(`${API_URL}/bills/groups`, { headers })
+    api.get('/bills/groups')
       .then(r => r.json()).then(j => setGroups(j.data || [])).catch(() => {});
     // Bills
-    fetch(`${API_URL}/bills/bills`, { headers })
+    api.get('/bills/bills')
       .then(r => r.json()).then(j => setBills(j.data || [])).catch(() => {});
     // Settlements
-    fetch(`${API_URL}/bills/settlements`, { headers })
+    api.get('/bills/settlements')
       .then(r => r.json()).then(j => setSettlements(j.data || [])).catch(() => {});
-  }, [API_URL]);
+  }, []);
 
   // Create bill (Quick Split) - optimistic update
+  const parseParticipants = (input: string): string[] => {
+    const raw = (input || '').split(',').map((s) => s.trim()).filter(Boolean);
+    // Always include You once
+    const withoutYou = raw.filter((n) => n.toLowerCase() !== 'you');
+    const list = ['You', ...withoutYou];
+    // de-dup while preserving order
+    return Array.from(new Set(list));
+  };
+
   const handleCreateQuickBill = async () => {
     const amount = parseFloat(newBillAmount);
     if (!newBillDescription.trim() || isNaN(amount) || amount <= 0) return;
     const token = getToken();
+    const names = parseParticipants(participantsInput);
+    const count = Math.max(1, names.length);
+    // Equal split with rounding fix
+    const base = Math.floor((amount / count) * 100) / 100;
+    const remainder = Number((amount - base * count).toFixed(2));
+    const shares = names.map((n, i) => base + (i === 0 ? remainder : 0));
     const temp = {
       id: `tmp-${Date.now()}`,
       description: newBillDescription.trim(),
@@ -52,29 +72,29 @@ export const Bills = () => {
       group: (groups[0]?.name || 'Personal'),
       date: new Date().toISOString().slice(0, 10),
       status: 'pending',
-      participants: ['You'],
-      yourShare: amount
+      participants: names,
+      yourShare: shares[names.indexOf('You')] ?? base
     } as any;
     setBills(prev => [temp, ...prev]);
     setNewBillAmount('');
     setNewBillDescription('');
+    setParticipantsInput('You, Friend');
 
-    if (!API_URL || !token) return;
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to create a bill.', variant: 'destructive' as any });
+      return;
+    }
     const payload = {
       groupId: groups[0]?.id || 'demo',
       title: temp.description,
       description: temp.description,
       totalAmount: amount,
-      participants: [{ userId: 'me', amount }],
+      participants: names.map((n, i) => ({ userId: n, amount: shares[i] })),
       category: 'general',
       date: new Date()
     };
     try {
-      await fetch(`${API_URL}/bills/bills`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
+      await api.post('/bills/bills', payload);
     } catch (_e) {
       // ignore; backend is mock; keep optimistic entry
     }
@@ -189,6 +209,12 @@ export const Bills = () => {
                     onChange={(e) => setNewBillAmount(e.target.value)}
                     className="glass-input"
                   />
+                  <Input
+                    placeholder="Participants (comma separated): You, Alice, Bob"
+                    value={participantsInput}
+                    onChange={(e) => setParticipantsInput(e.target.value)}
+                    className="glass-input"
+                  />
                   <Button className="w-full neon-button" onClick={handleCreateQuickBill}>
                     <Plus className="w-4 h-4 mr-2" />
                     Create & Split Bill
@@ -213,11 +239,41 @@ export const Bills = () => {
           <TabsContent value="bills" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">All Bills</h2>
-              <Button className="neon-button">
+              <Button className="neon-button" onClick={() => setShowAddForm((v) => !v)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Bill
+                {showAddForm ? 'Close' : 'Add Bill'}
               </Button>
             </div>
+
+            {showAddForm && (
+              <Card className="glass-card p-6">
+                <h3 className="font-semibold mb-4">Create Bill</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    placeholder="Description"
+                    value={newBillDescription}
+                    onChange={(e) => setNewBillDescription(e.target.value)}
+                    className="glass-input"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Amount"
+                    value={newBillAmount}
+                    onChange={(e) => setNewBillAmount(e.target.value)}
+                    className="glass-input"
+                  />
+                  <Input
+                    placeholder="Participants: You, Alice, Bob"
+                    value={participantsInput}
+                    onChange={(e) => setParticipantsInput(e.target.value)}
+                    className="glass-input"
+                  />
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={async () => { await handleCreateQuickBill(); setShowAddForm(false); }}>Save Bill</Button>
+                </div>
+              </Card>
+            )}
 
             <div className="space-y-4">
               {bills.map((bill) => (

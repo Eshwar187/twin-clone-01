@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="TWIN Logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FF7A18"/>
+      <stop offset="50%" stop-color="#F542A7"/>
+      <stop offset="100%" stop-color="#5C2CF8"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="#0B0B12"/>
+  <g filter="url(#glow)">
+    <circle cx="256" cy="256" r="168" fill="url(#g)" opacity="0.15"/>
+    <path d="M292 96l-80 152h66l-58 168 178-224h-86l56-96z" fill="url(#g)"/>
+  </g>
+  <text x="50%" y="470" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui" font-size="64" fill="#ffffff" opacity="0.9">TWIN</text>
+</svg>

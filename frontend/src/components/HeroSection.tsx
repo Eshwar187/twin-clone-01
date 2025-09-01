@@ -78,7 +78,7 @@ export const HeroSection = ({ currentTime, onQuickAction }: HeroSectionProps) =>
             <Card className="glass-card p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold gradient-text">Digital Twin Status</h3>
+                  <h3 className="text-lg font-semibold gradient-text">TWIN Status</h3>
                   <p className="text-muted-foreground">Your AI is learning and adapting</p>
                 </div>
                 <Brain className="w-8 h-8 text-primary animate-pulse" />

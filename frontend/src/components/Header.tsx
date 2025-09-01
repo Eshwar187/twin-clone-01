@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMood } from '@/context/MoodContext';
 import { 
   Brain, 
+  Zap,
   Calendar, 
   Heart, 
   FileText, 
@@ -47,11 +48,11 @@ export const Header = ({
           {/* Logo & Branding */}
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Brain className="w-5 h-5 text-primary-foreground" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-fuchsia-500 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold gradient-text">
-                Digital Twin
+                TWIN
               </h1>
             </div>
           </div>
@@ -84,7 +85,7 @@ export const Header = ({
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" onClick={() => onModuleChange?.('settings')}>
                   <Settings className="w-4 h-4" />
                 </Button>
                 <Avatar state={mood} size="sm" name={userName} showCaption={false} />

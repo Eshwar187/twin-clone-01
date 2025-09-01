@@ -132,6 +132,17 @@ apiRouter.use('/analytics', authMiddleware, analyticsRoutes);
 
 app.use(`/api/${API_VERSION}`, apiRouter);
 
+// Root info route to avoid 404 confusion when hitting '/'
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Digital Doppelgänger Backend',
+    apiBase: `/api/${API_VERSION}`,
+    health: '/health',
+    docs: 'Use authenticated routes under apiBase (e.g., /health/dashboard)'
+  });
+});
+
 // Setup Socket.IO
 setupSocketIO(io);
 

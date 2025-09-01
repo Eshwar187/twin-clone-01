@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,12 +46,84 @@ export const Settings = () => {
     crashReporting: true
   });
 
+  // Load profile and preferences from backend
+  useEffect(() => {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to manage settings.', variant: 'destructive' as any });
+      return;
+    }
+    (async () => {
+      try {
+        // Profile
+        const resProf = await api.get('/user/profile');
+        if (resProf.ok) {
+          const j = await resProf.json();
+          const u = j?.data?.user;
+          if (u) {
+            setProfile((p) => ({
+              ...p,
+              name: u.name || p.name,
+              email: u.email || p.email,
+              timezone: u.preferences?.profile?.timezone || p.timezone,
+              currency: u.preferences?.profile?.currency || u.preferences?.currency || p.currency,
+            }));
+          }
+        }
+      } catch {}
+
+      try {
+        // Preferences
+        const resPref = await api.get('/user/preferences');
+        if (resPref.ok) {
+          const j = await resPref.json();
+          const prefs = j?.data?.preferences || {};
+          if (prefs.notifications) setNotifications((n) => ({ ...n, ...prefs.notifications }));
+          if (prefs.appearance?.darkMode != null) setDarkMode(!!prefs.appearance.darkMode);
+          if (prefs.privacy) setPrivacy((pv) => ({ ...pv, ...prefs.privacy }));
+          if (prefs.profile) setProfile((p) => ({ ...p, ...prefs.profile }));
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+    if (!token) {
+      toast({ title: 'Login required', description: 'Sign in to save settings.', variant: 'destructive' as any });
+      return;
+    }
+    const preferences = {
+      notifications: { ...notifications },
+      appearance: { darkMode },
+      privacy: { ...privacy },
+      profile: { timezone: profile.timezone, currency: profile.currency },
+    };
+    try {
+      const [res1, res2] = await Promise.all([
+        api.patch('/user/profile', { name: profile.name }),
+        api.patch('/user/preferences', { preferences }),
+      ]);
+      if (!res1.ok && !res2.ok) throw new Error('Failed to save');
+      toast({ title: 'Settings saved', description: 'Your preferences have been updated.' });
+      // Update local user cache for currency/timezone consistency
+      try {
+        const raw = localStorage.getItem('user');
+        const user = raw ? JSON.parse(raw) : {};
+        const updated = { ...user, name: profile.name, preferences: { ...(user.preferences || {}), ...preferences }, locale: user.locale, currency: profile.currency };
+        localStorage.setItem('user', JSON.stringify(updated));
+      } catch {}
+    } catch (e: any) {
+      toast({ title: 'Save failed', description: e?.message || 'Unable to save settings', variant: 'destructive' as any });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="container mx-auto max-w-4xl">
         <div className="mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">Settings</h1>
-          <p className="text-muted-foreground">Customize your Digital Doppelgänger experience</p>
+          <p className="text-muted-foreground">Customize your TWIN experience</p>
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
@@ -423,7 +497,7 @@ export const Settings = () => {
 
         <div className="mt-8 flex justify-end space-x-4">
           <Button variant="outline">Cancel</Button>
-          <Button className="neon-button">Save Changes</Button>
+          <Button className="neon-button" onClick={handleSave}>Save Changes</Button>
         </div>
       </div>
     </div>

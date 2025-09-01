@@ -64,11 +64,8 @@ export const Dashboard = ({ onModuleSelect }: DashboardProps) => {
     });
   }, [setSignals]);
 
-  const handleQuickAction = (action: string) => {
-    toast({
-      title: `${action.charAt(0).toUpperCase() + action.slice(1)} Session`,
-      description: "Feature coming soon! Connect to Supabase for full functionality.",
-    });
+  const handleQuickAction = (_action: string) => {
+    // Intentionally no-op until wired to real actions
   };
 
   return (

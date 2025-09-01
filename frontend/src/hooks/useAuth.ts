@@ -6,7 +6,11 @@ export const useAuth = () => {
   const setSession = useCallback((token: string, refreshToken?: string, user?: any) => {
     localStorage.setItem('token', token);
     if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
-    if (user) localStorage.setItem('user', JSON.stringify(user));
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+      const ob = (user?.onboardingCompleted === true);
+      localStorage.setItem('onboardingCompleted', ob ? 'true' : 'false');
+    }
   }, []);
 
   const clearSession = useCallback(() => {
@@ -38,7 +42,8 @@ export const useAuth = () => {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.message || 'Registration failed');
     const user = country ? { ...json.data.user, country } : json.data.user;
-    setSession(json.data.token, json.data.refreshToken, user);
+    // New users default to not completed onboarding
+    setSession(json.data.token, json.data.refreshToken, { ...user, onboardingCompleted: false });
     return { ...json.data, user };
   }, [setSession]);
 
@@ -52,5 +57,17 @@ export const useAuth = () => {
 
   const isAuthenticated = !!(localStorage.getItem('token'));
 
-  return { login, register, logout, getToken, isAuthenticated };
+  const markOnboardingComplete = useCallback(() => {
+    localStorage.setItem('onboardingCompleted', 'true');
+    const userRaw = localStorage.getItem('user');
+    if (userRaw) {
+      try {
+        const u = JSON.parse(userRaw);
+        u.onboardingCompleted = true;
+        localStorage.setItem('user', JSON.stringify(u));
+      } catch {}
+    }
+  }, []);
+
+  return { login, register, logout, getToken, isAuthenticated, markOnboardingComplete };
 };

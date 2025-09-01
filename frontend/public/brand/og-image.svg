@@ -1,0 +1,17 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'>
+  <defs>
+    <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0%' stop-color='#FF7A18'/>
+      <stop offset='50%' stop-color='#F542A7'/>
+      <stop offset='100%' stop-color='#5C2CF8'/>
+    </linearGradient>
+  </defs>
+  <rect width='1200' height='630' fill='#0B0B12'/>
+  <circle cx='900' cy='180' r='220' fill='url(#g)' opacity='0.2'/>
+  <g transform='translate(140,120)'>
+    <rect x='0' y='0' width='160' height='160' rx='36' fill='url(#g)'/>
+    <path d='M96 20l-52 98h43l-38 108 116-144h-56l36-62z' fill='#fff' opacity='0.95'/>
+  </g>
+  <text x='140' y='360' font-family='Inter, ui-sans-serif, system-ui' font-weight='800' font-size='96' fill='#ffffff'>TWIN</text>
+  <text x='140' y='430' font-family='Inter, ui-sans-serif, system-ui' font-size='28' fill='#9AA0A6'>Your AI Companion</text>
+</svg>
